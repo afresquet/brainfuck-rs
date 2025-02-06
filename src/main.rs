@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use brainfuck::{Executor, IntermediateRepresentation, Lexer};
 use clap::{Parser, ValueEnum};
 
+/// A Brainfuck interpreter
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
@@ -15,8 +16,11 @@ struct Cli {
 
 #[derive(ValueEnum, Clone, Copy)]
 enum Commands {
+    /// Transform the program into [`Token`]s.
     Tokenize,
+    /// Transform the program into [`Instruction`]s.
     IR,
+    /// Parse the program and run it.
     Run,
 }
 

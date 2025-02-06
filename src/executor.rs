@@ -4,11 +4,16 @@ use thiserror::Error;
 
 use crate::{IRError, Instruction, IntermediateRepresentation};
 
+/// Program runner.
 #[derive(Debug)]
 pub struct Executor<I, O, const N: usize = 30000> {
+    /// Byte array.
     data: [u8; N],
+    /// Cursor to the current cell in `data`.
     pointer: usize,
+    /// Input stream.
     input: I,
+    /// Output stream.
     output: O,
 }
 

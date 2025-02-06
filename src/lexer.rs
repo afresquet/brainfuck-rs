@@ -2,7 +2,7 @@ use std::str::Chars;
 
 use crate::Token;
 
-/// Lexical analyzer that transforms a program to Tokens.
+/// Lexical analyzer that transforms a program to [`Token`]s.
 #[derive(Debug)]
 pub struct Lexer<I> {
     iter: I,
@@ -43,7 +43,7 @@ impl Iterator for Lexer<Chars<'_>> {
     }
 }
 
-/// Lexical analyzer that transforms a program to Tokens.
+/// Lexical analyzer that transforms a program to [`Token`]s.
 /// Can be peeked.
 #[derive(Debug)]
 pub struct PeekableLexer<'a> {

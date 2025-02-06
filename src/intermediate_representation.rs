@@ -2,6 +2,7 @@ use thiserror::Error;
 
 use crate::{Instruction, Lexer, PeekableLexer, Token};
 
+/// Transformer from [`Token`]s to [`Instruction`]s.
 #[derive(Debug)]
 pub struct IntermediateRepresentation<'a, I> {
     program: &'a str,

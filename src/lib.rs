@@ -1,3 +1,5 @@
+#![doc = include_str!("../README.md")]
+
 pub mod executor;
 pub mod instruction;
 pub mod intermediate_representation;

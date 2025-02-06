@@ -2,6 +2,7 @@ use std::fmt::Display;
 
 use thiserror::Error;
 
+/// Representation of the characters as language commands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Token {
     /// >
