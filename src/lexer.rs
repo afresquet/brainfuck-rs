@@ -2,19 +2,18 @@ use std::str::Chars;
 
 use crate::Token;
 
+/// Lexical analyzer that transforms a program to Tokens.
 #[derive(Debug)]
-pub struct Lexer<'a, I> {
-    program: &'a str,
+pub struct Lexer<I> {
     iter: I,
-    i: usize,
+    index: usize,
 }
 
-impl<'a> Lexer<'a, Chars<'a>> {
+impl<'a> Lexer<Chars<'a>> {
     pub fn new(program: &'a str) -> Self {
         Self {
-            program,
             iter: program.chars(),
-            i: 0,
+            index: 0,
         }
     }
 
@@ -26,22 +25,17 @@ impl<'a> Lexer<'a, Chars<'a>> {
     }
 
     pub fn index(&self) -> usize {
-        self.i
-    }
-
-    pub fn reset(&mut self) {
-        self.iter = self.program.chars();
-        self.i = 0;
+        self.index
     }
 }
 
-impl<'a> Iterator for Lexer<'a, Chars<'a>> {
+impl Iterator for Lexer<Chars<'_>> {
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let c = self.iter.next()?;
-            self.i += 1;
+            self.index += 1;
             if let Ok(token) = c.try_into() {
                 return Some(token);
             }
@@ -49,9 +43,11 @@ impl<'a> Iterator for Lexer<'a, Chars<'a>> {
     }
 }
 
+/// Lexical analyzer that transforms a program to Tokens.
+/// Can be peeked.
 #[derive(Debug)]
 pub struct PeekableLexer<'a> {
-    lexer: Lexer<'a, Chars<'a>>,
+    lexer: Lexer<Chars<'a>>,
     peeked: Option<Option<Token>>,
 }
 
@@ -72,10 +68,6 @@ impl PeekableLexer<'_> {
 
     pub fn index(&self) -> usize {
         self.lexer.index()
-    }
-
-    pub fn reset(&mut self) {
-        self.lexer.reset();
     }
 }
 

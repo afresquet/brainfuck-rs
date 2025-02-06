@@ -1,7 +1,8 @@
 use std::fmt::Display;
 
-use crate::{IntermediateRepresentation, PeekableLexer};
+use crate::IntermediateRepresentation;
 
+/// Instruction of the language.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction<'a> {
     /// >
@@ -31,7 +32,7 @@ pub enum Instruction<'a> {
     /// []
     ///
     /// Loop if the data pointer is not zero.
-    Loop(InstructionLoop<'a>),
+    Loop { program: &'a str },
 }
 
 impl Display for Instruction<'_> {
@@ -43,9 +44,9 @@ impl Display for Instruction<'_> {
             Instruction::Decrement(amount) => write!(f, "Decrement {amount} times"),
             Instruction::Output => write!(f, "Output"),
             Instruction::Input => write!(f, "Input"),
-            Instruction::Loop(instructions) => {
+            Instruction::Loop { program } => {
                 writeln!(f, "Start Loop:")?;
-                for instruction in instructions {
+                for instruction in IntermediateRepresentation::new(program) {
                     match instruction {
                         Ok(instruction) => writeln!(f, "{instruction}")?,
                         Err(error) => writeln!(f, "ERROR: {error}")?,
@@ -54,26 +55,5 @@ impl Display for Instruction<'_> {
                 write!(f, "End Loop")
             }
         }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InstructionLoop<'a> {
-    program: &'a str,
-}
-
-impl<'a> InstructionLoop<'a> {
-    pub fn new(program: &'a str) -> Self {
-        Self { program }
-    }
-}
-
-impl<'a> IntoIterator for &InstructionLoop<'a> {
-    type Item = <Self::IntoIter as Iterator>::Item;
-
-    type IntoIter = IntermediateRepresentation<'a, PeekableLexer<'a>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        IntermediateRepresentation::new(self.program)
     }
 }

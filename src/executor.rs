@@ -2,7 +2,7 @@ use std::io::{Read, Stdin, Stdout, Write};
 
 use thiserror::Error;
 
-use crate::{IRError, Instruction};
+use crate::{IRError, Instruction, IntermediateRepresentation};
 
 #[derive(Debug)]
 pub struct Executor<I, O, const N: usize = 30000> {
@@ -48,9 +48,9 @@ where
                 let len = self.input.read(&mut input)?;
                 self.data[self.pointer] = parse_input(&input, len)?;
             }
-            Instruction::Loop(instructions) => {
+            Instruction::Loop { program } => {
                 while self.data[self.pointer] > 0 {
-                    for instruction in instructions {
+                    for instruction in IntermediateRepresentation::new(program) {
                         self.execute(&instruction?)?;
                     }
                 }

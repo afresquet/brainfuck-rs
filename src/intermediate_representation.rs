@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{Instruction, InstructionLoop, Lexer, PeekableLexer, Token};
+use crate::{Instruction, Lexer, PeekableLexer, Token};
 
 #[derive(Debug)]
 pub struct IntermediateRepresentation<'a, I> {
@@ -73,9 +73,9 @@ impl<'a> Iterator for IntermediateRepresentation<'a, PeekableLexer<'a>> {
                 // the - 1 removes the ] at the end
                 let end = self.iter.index() - 1;
 
-                let loop_program = &self.program[start..end];
-
-                Some(Ok(Instruction::Loop(InstructionLoop::new(loop_program))))
+                Some(Ok(Instruction::Loop {
+                    program: &self.program[start..end],
+                }))
             }
             Token::LoopEnd => Some(Err(IRError::UnmatchedLoopEnd)),
         }
@@ -97,17 +97,17 @@ mod tests {
         assert_eq!(ir.next(), Some(Ok(Instruction::Output)));
         assert_eq!(ir.next(), Some(Ok(Instruction::Output)));
         assert_eq!(ir.next(), Some(Ok(Instruction::Input)));
-        let Some(Ok(Instruction::Loop(outer_instruction_loop))) = ir.next() else {
+        let Some(Ok(Instruction::Loop { program })) = ir.next() else {
             panic!("should be a loop");
         };
-        assert_eq!(outer_instruction_loop, InstructionLoop::new("[--->>]"));
-        let Some(Ok(Instruction::Loop(inner_instruction_loop))) =
-            outer_instruction_loop.into_iter().next()
+        assert_eq!(program, "[--->>]");
+        let Some(Ok(Instruction::Loop { program })) =
+            IntermediateRepresentation::new(program).next()
         else {
             panic!("should be a loop");
         };
-        assert_eq!(inner_instruction_loop, InstructionLoop::new("--->>"));
-        let mut inner_instruction_loop = inner_instruction_loop.into_iter();
+        assert_eq!(program, "--->>");
+        let mut inner_instruction_loop = IntermediateRepresentation::new(program);
         assert_eq!(
             inner_instruction_loop.next(),
             Some(Ok(Instruction::Decrement(3)))
@@ -116,11 +116,11 @@ mod tests {
             inner_instruction_loop.next(),
             Some(Ok(Instruction::MoveRight(2)))
         );
-        let Some(Ok(Instruction::Loop(instruction_loop))) = ir.next() else {
+        let Some(Ok(Instruction::Loop { program })) = ir.next() else {
             panic!("should be a loop");
         };
-        assert_eq!(instruction_loop, InstructionLoop::new("++<"));
-        let mut instruction_loop = instruction_loop.into_iter();
+        assert_eq!(program, "++<");
+        let mut instruction_loop = IntermediateRepresentation::new(program);
         assert_eq!(instruction_loop.next(), Some(Ok(Instruction::Increment(2))));
         assert_eq!(instruction_loop.next(), Some(Ok(Instruction::MoveLeft(1))));
         assert_eq!(ir.next(), None);
