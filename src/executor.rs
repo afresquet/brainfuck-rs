@@ -2,7 +2,7 @@ use std::io::{BufRead, BufReader, Read, Stdin, Stdout, Write};
 
 use thiserror::Error;
 
-use crate::Instruction;
+use crate::{IRError, Instruction};
 
 #[derive(Debug)]
 pub struct Executor<I, O, const N: usize = 30000> {
@@ -53,7 +53,7 @@ where
             Instruction::Loop(instructions) => {
                 while self.data[self.pointer] > 0 {
                     for instruction in instructions {
-                        self.execute(instruction)?;
+                        self.execute(&instruction?)?;
                     }
                 }
             }
@@ -71,8 +71,10 @@ impl Default for Executor<Stdin, Stdout> {
 
 #[derive(Debug, Error)]
 pub enum ExecutorError {
-    #[error("error from stdin/stdout: {0}")]
+    #[error("error from input/output: {0}")]
     IO(#[from] std::io::Error),
     #[error("error parsing input to an int: {0}")]
     ParseIntError(#[from] std::num::ParseIntError),
+    #[error("error from intermediate representation: {0}")]
+    IRError(#[from] IRError),
 }

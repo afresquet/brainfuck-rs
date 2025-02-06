@@ -1,20 +1,19 @@
-use std::iter::Peekable;
-
 use thiserror::Error;
 
-use crate::{Instruction, Token};
+use crate::{Instruction, InstructionLoop, Lexer, PeekableLexer, Token};
 
 #[derive(Debug)]
-pub struct IntermediateRepresentation<I> {
+pub struct IntermediateRepresentation<'a, I> {
+    program: &'a str,
     iter: I,
 }
 
-impl<I> IntermediateRepresentation<Peekable<I>>
-where
-    I: Iterator<Item = Token>,
-{
-    pub fn new(iter: Peekable<I>) -> Self {
-        Self { iter }
+impl<'a> IntermediateRepresentation<'a, PeekableLexer<'a>> {
+    pub fn new(program: &'a str) -> Self {
+        Self {
+            program,
+            iter: Lexer::new(program).to_peekable(),
+        }
     }
 }
 
@@ -26,11 +25,8 @@ pub enum IRError {
     UnmatchedLoopEnd,
 }
 
-impl<I> Iterator for IntermediateRepresentation<Peekable<I>>
-where
-    I: Iterator<Item = Token>,
-{
-    type Item = Result<Instruction, IRError>;
+impl<'a> Iterator for IntermediateRepresentation<'a, PeekableLexer<'a>> {
+    type Item = Result<Instruction<'a>, IRError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         macro_rules! instruction_amount {
@@ -62,22 +58,24 @@ where
             Token::Output => Some(Ok(Instruction::Output)),
             Token::Input => Some(Ok(Instruction::Input)),
             Token::LoopStart => {
-                let mut instructions = Vec::new();
+                let start = self.iter.index();
 
-                loop {
-                    if matches!(self.iter.peek(), Some(Token::LoopEnd)) {
-                        self.iter.next();
-                        break;
-                    }
-
-                    match self.next() {
-                        Some(Ok(instruction)) => instructions.push(instruction),
-                        Some(Err(error)) => return Some(Err(error)),
+                let mut open: usize = 1;
+                while open != 0 {
+                    match self.iter.next() {
+                        Some(Token::LoopStart) => open += 1,
+                        Some(Token::LoopEnd) => open -= 1,
+                        Some(_) => (),
                         None => return Some(Err(IRError::UnmatchedLoopStart)),
                     }
                 }
 
-                Some(Ok(Instruction::Loop(instructions)))
+                // the - 1 removes the ] at the end
+                let end = self.iter.index() - 1;
+
+                let loop_program = &self.program[start..end];
+
+                Some(Ok(Instruction::Loop(InstructionLoop::new(loop_program))))
             }
             Token::LoopEnd => Some(Err(IRError::UnmatchedLoopEnd)),
         }
@@ -86,15 +84,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::Lexer;
-
     use super::*;
 
     #[test]
     fn parses_instructions() {
         let input = ">>><<++++-..,[[--->>]][++<]";
-        let lexer = Lexer::new(input.chars());
-        let mut ir = IntermediateRepresentation::new(lexer.peekable());
+        let mut ir = IntermediateRepresentation::new(input);
         assert_eq!(ir.next(), Some(Ok(Instruction::MoveRight(3))));
         assert_eq!(ir.next(), Some(Ok(Instruction::MoveLeft(2))));
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(4))));
@@ -102,28 +97,39 @@ mod tests {
         assert_eq!(ir.next(), Some(Ok(Instruction::Output)));
         assert_eq!(ir.next(), Some(Ok(Instruction::Output)));
         assert_eq!(ir.next(), Some(Ok(Instruction::Input)));
+        let Some(Ok(Instruction::Loop(outer_instruction_loop))) = ir.next() else {
+            panic!("should be a loop");
+        };
+        assert_eq!(outer_instruction_loop, InstructionLoop::new("[--->>]"));
+        let Some(Ok(Instruction::Loop(inner_instruction_loop))) =
+            outer_instruction_loop.into_iter().next()
+        else {
+            panic!("should be a loop");
+        };
+        assert_eq!(inner_instruction_loop, InstructionLoop::new("--->>"));
+        let mut inner_instruction_loop = inner_instruction_loop.into_iter();
         assert_eq!(
-            ir.next(),
-            Some(Ok(Instruction::Loop(vec![Instruction::Loop(vec![
-                Instruction::Decrement(3),
-                Instruction::MoveRight(2)
-            ])])))
+            inner_instruction_loop.next(),
+            Some(Ok(Instruction::Decrement(3)))
         );
         assert_eq!(
-            ir.next(),
-            Some(Ok(Instruction::Loop(vec![
-                Instruction::Increment(2),
-                Instruction::MoveLeft(1)
-            ])))
+            inner_instruction_loop.next(),
+            Some(Ok(Instruction::MoveRight(2)))
         );
+        let Some(Ok(Instruction::Loop(instruction_loop))) = ir.next() else {
+            panic!("should be a loop");
+        };
+        assert_eq!(instruction_loop, InstructionLoop::new("++<"));
+        let mut instruction_loop = instruction_loop.into_iter();
+        assert_eq!(instruction_loop.next(), Some(Ok(Instruction::Increment(2))));
+        assert_eq!(instruction_loop.next(), Some(Ok(Instruction::MoveLeft(1))));
         assert_eq!(ir.next(), None);
     }
 
     #[test]
     fn amount_wraps_around() {
-        let input = std::iter::repeat_n('+', 260);
-        let lexer = Lexer::new(input);
-        let mut ir = IntermediateRepresentation::new(lexer.peekable());
+        let input: String = std::iter::repeat_n('+', 260).collect();
+        let mut ir = IntermediateRepresentation::new(&input);
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(4))));
         assert_eq!(ir.next(), None);
     }
@@ -131,8 +137,7 @@ mod tests {
     #[test]
     fn errors_on_unmatched_loop_start() {
         let input = "+++[---";
-        let lexer = Lexer::new(input.chars());
-        let mut ir = IntermediateRepresentation::new(lexer.peekable());
+        let mut ir = IntermediateRepresentation::new(input);
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(3))));
         assert_eq!(ir.next(), Some(Err(IRError::UnmatchedLoopStart)));
     }
@@ -140,8 +145,7 @@ mod tests {
     #[test]
     fn errors_on_unmatched_loop_end() {
         let input = "+++]---";
-        let lexer = Lexer::new(input.chars());
-        let mut ir = IntermediateRepresentation::new(lexer.peekable());
+        let mut ir = IntermediateRepresentation::new(input);
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(3))));
         assert_eq!(ir.next(), Some(Err(IRError::UnmatchedLoopEnd)));
     }

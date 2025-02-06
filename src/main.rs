@@ -23,7 +23,7 @@ enum Commands {
 fn main() {
     let args = Cli::parse();
 
-    let content = if let Some(file) = args.file {
+    let program = if let Some(file) = args.file {
         std::fs::read_to_string(file).expect("failed to read file")
     } else {
         args.program
@@ -32,25 +32,21 @@ fn main() {
 
     match args.command {
         Commands::Tokenize => {
-            let lexer = Lexer::new(content.chars());
+            let lexer = Lexer::new(program.as_str());
             for token in lexer {
                 println!("{token}");
             }
         }
         Commands::IR => {
-            let lexer = Lexer::new(content.chars());
-            let ir = IntermediateRepresentation::new(lexer.peekable());
-            for instruction in ir {
-                let instruction = instruction.unwrap();
+            let ir = IntermediateRepresentation::new(program.as_str());
+            for instruction in ir.map(Result::unwrap) {
                 println!("{instruction}");
             }
         }
         Commands::Run => {
-            let lexer = Lexer::new(content.chars());
-            let ir = IntermediateRepresentation::new(lexer.peekable());
+            let ir = IntermediateRepresentation::new(program.as_str());
             let mut executor = Executor::default();
-            for instruction in ir {
-                let instruction = instruction.unwrap();
+            for instruction in ir.map(Result::unwrap) {
                 executor.execute(&instruction).unwrap();
             }
         }
