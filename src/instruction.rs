@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use core::fmt::Display;
 
 use crate::IntermediateRepresentation;
 
@@ -36,7 +36,7 @@ pub enum Instruction<'a> {
 }
 
 impl Display for Instruction<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Instruction::MoveRight(amount) => write!(f, "Increment pointer {amount} times"),
             Instruction::MoveLeft(amount) => write!(f, "Decrement pointer {amount} times"),

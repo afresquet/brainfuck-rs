@@ -1,4 +1,4 @@
-use std::str::Chars;
+use core::str::Chars;
 
 use thiserror::Error;
 
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn amount_wraps_around() {
-        let input: String = std::iter::repeat_n('+', 260).collect();
+        let input: String = core::iter::repeat_n('+', 260).collect();
         let mut ir = IntermediateRepresentation::new(&input);
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(4))));
         assert_eq!(ir.next(), None);
