@@ -17,11 +17,7 @@ pub struct Executor<I, O, const N: usize = 30000> {
     output: O,
 }
 
-impl<I, O, const N: usize> Executor<I, O, N>
-where
-    I: Read,
-    O: Write,
-{
+impl<I, O, const N: usize> Executor<I, O, N> {
     pub fn new(input: I, output: O) -> Self {
         Self {
             data: [0; N],
@@ -30,7 +26,13 @@ where
             output,
         }
     }
+}
 
+impl<I, O, const N: usize> Executor<I, O, N>
+where
+    I: Read,
+    O: Write,
+{
     pub fn execute(&mut self, instruction: &Instruction) -> Result<(), ExecutorError> {
         match instruction {
             Instruction::MoveRight(amount) => {
@@ -76,8 +78,6 @@ impl Default for Executor<Stdin, Stdout> {
 pub enum ExecutorError {
     #[error("error from input/output: {0}")]
     IO(#[from] std::io::Error),
-    #[error("error parsing input to an int: {0}")]
-    ParseIntError(#[from] std::num::ParseIntError),
     #[error(transparent)]
     IRError(#[from] IRError),
     #[error(transparent)]
@@ -85,6 +85,8 @@ pub enum ExecutorError {
 }
 
 fn parse_input(input: &[u8], len: usize) -> Result<u8, ParseInputError> {
+    assert!(input.len() >= len);
+
     match len {
         2..=4 => {
             let mut value: u8 = 0;
@@ -102,7 +104,7 @@ fn parse_input(input: &[u8], len: usize) -> Result<u8, ParseInputError> {
 
             Ok(value)
         }
-        ..=1 | 5.. => Err(ParseInputError::BadInput),
+        _ => Err(ParseInputError::BadInput),
     }
 }
 
@@ -124,7 +126,7 @@ mod tests {
 
     #[test]
     fn parse_input_one_digit() {
-        let mut input = [0; 3];
+        let mut input = [0; 5];
         input[0] = '9' as u8;
         assert_eq!(parse_input(&input, 2), Ok(9));
         input[0] = '5' as u8;
@@ -133,7 +135,7 @@ mod tests {
 
     #[test]
     fn parse_input_two_digit() {
-        let mut input = [0; 3];
+        let mut input = [0; 5];
         input[0] = '9' as u8;
         input[1] = '5' as u8;
         assert_eq!(parse_input(&input, 3), Ok(95));
@@ -144,7 +146,7 @@ mod tests {
 
     #[test]
     fn parse_input_three_digit() {
-        let mut input = [0; 3];
+        let mut input = [0; 5];
         input[0] = '1' as u8;
         input[1] = '9' as u8;
         input[2] = '8' as u8;
@@ -157,15 +159,15 @@ mod tests {
 
     #[test]
     fn parse_bad_input_error() {
-        assert_eq!(parse_input(&[], 0), Err(ParseInputError::BadInput));
-        assert_eq!(parse_input(&[], 1), Err(ParseInputError::BadInput));
-        assert_eq!(parse_input(&[], 5), Err(ParseInputError::BadInput));
-        assert_eq!(parse_input(&[], 10), Err(ParseInputError::BadInput));
+        assert_eq!(parse_input(&[0; 0], 0), Err(ParseInputError::BadInput));
+        assert_eq!(parse_input(&[0; 1], 1), Err(ParseInputError::BadInput));
+        assert_eq!(parse_input(&[0; 5], 5), Err(ParseInputError::BadInput));
+        assert_eq!(parse_input(&[0; 10], 10), Err(ParseInputError::BadInput));
     }
 
     #[test]
     fn parse_input_invalid_character_error() {
-        let mut input = [0; 3];
+        let mut input = [0; 5];
         input[0] = 'a' as u8;
         assert_eq!(
             parse_input(&input, 2),
@@ -181,10 +183,16 @@ mod tests {
 
     #[test]
     fn parse_input_too_big_error() {
-        let mut input = [0; 3];
+        let mut input = [0; 5];
         input[0] = '2' as u8;
         input[1] = '5' as u8;
         input[2] = '6' as u8;
         assert_eq!(parse_input(&input, 4), Err(ParseInputError::NumberTooBig));
+    }
+
+    #[test]
+    #[should_panic]
+    fn parse_input_panic_if_bad_len() {
+        assert_eq!(parse_input(&[], 1), Err(ParseInputError::BadInput));
     }
 }

@@ -1,5 +1,3 @@
-use std::str::Chars;
-
 use crate::Token;
 
 /// Lexical analyzer that transforms a program to [`Token`]s.
@@ -9,27 +7,24 @@ pub struct Lexer<I> {
     index: usize,
 }
 
-impl<'a> Lexer<Chars<'a>> {
-    pub fn new(program: &'a str) -> Self {
-        Self {
-            iter: program.chars(),
-            index: 0,
-        }
-    }
-
-    pub fn to_peekable(self) -> PeekableLexer<'a> {
-        PeekableLexer {
-            lexer: self,
-            peeked: None,
-        }
+impl<I> Lexer<I> {
+    pub fn new(iter: I) -> Self {
+        Self { iter, index: 0 }
     }
 
     pub fn index(&self) -> usize {
         self.index
     }
+
+    pub fn to_peekable(self) -> PeekableLexer<Self> {
+        PeekableLexer::new(self)
+    }
 }
 
-impl Iterator for Lexer<Chars<'_>> {
+impl<I> Iterator for Lexer<I>
+where
+    I: Iterator<Item = char>,
+{
     type Item = Token;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -46,12 +41,24 @@ impl Iterator for Lexer<Chars<'_>> {
 /// Lexical analyzer that transforms a program to [`Token`]s.
 /// Can be peeked.
 #[derive(Debug)]
-pub struct PeekableLexer<'a> {
-    lexer: Lexer<Chars<'a>>,
+pub struct PeekableLexer<L> {
+    lexer: L,
     peeked: Option<Option<Token>>,
 }
 
-impl PeekableLexer<'_> {
+impl<L> PeekableLexer<L> {
+    pub fn new(lexer: L) -> Self {
+        Self {
+            lexer,
+            peeked: None,
+        }
+    }
+}
+
+impl<I> PeekableLexer<Lexer<I>>
+where
+    I: Iterator<Item = char>,
+{
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<Token> {
         match self.peeked.take() {
@@ -78,7 +85,7 @@ mod tests {
     #[test]
     fn parses_tokens() {
         let input = "><+-.,[]";
-        let mut lexer = Lexer::new(input);
+        let mut lexer = Lexer::new(input.chars());
         assert_eq!(lexer.next(), Some(Token::MoveRight));
         assert_eq!(lexer.next(), Some(Token::MoveLeft));
         assert_eq!(lexer.next(), Some(Token::Increment));
@@ -93,7 +100,7 @@ mod tests {
     #[test]
     fn ignores_non_token_characters() {
         let input = "[1-r2.";
-        let mut lexer = Lexer::new(input);
+        let mut lexer = Lexer::new(input.chars());
         assert_eq!(lexer.next(), Some(Token::LoopStart));
         assert_eq!(lexer.next(), Some(Token::Decrement));
         assert_eq!(lexer.next(), Some(Token::Output));

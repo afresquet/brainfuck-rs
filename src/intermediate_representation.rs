@@ -1,3 +1,5 @@
+use std::str::Chars;
+
 use thiserror::Error;
 
 use crate::{Instruction, Lexer, PeekableLexer, Token};
@@ -9,11 +11,11 @@ pub struct IntermediateRepresentation<'a, I> {
     iter: I,
 }
 
-impl<'a> IntermediateRepresentation<'a, PeekableLexer<'a>> {
+impl<'a> IntermediateRepresentation<'a, PeekableLexer<Lexer<Chars<'a>>>> {
     pub fn new(program: &'a str) -> Self {
         Self {
             program,
-            iter: Lexer::new(program).to_peekable(),
+            iter: Lexer::new(program.chars()).to_peekable(),
         }
     }
 }
@@ -26,7 +28,10 @@ pub enum IRError {
     UnmatchedLoopEnd,
 }
 
-impl<'a> Iterator for IntermediateRepresentation<'a, PeekableLexer<'a>> {
+impl<'a, I> Iterator for IntermediateRepresentation<'a, PeekableLexer<Lexer<I>>>
+where
+    I: Iterator<Item = char>,
+{
     type Item = Result<Instruction<'a>, IRError>;
 
     fn next(&mut self) -> Option<Self::Item> {
