@@ -15,66 +15,23 @@ impl<I> Lexer<I> {
     pub fn index(&self) -> usize {
         self.index
     }
-
-    pub fn to_peekable(self) -> PeekableLexer<Self> {
-        PeekableLexer::new(self)
-    }
 }
 
 impl<I> Iterator for Lexer<I>
 where
     I: Iterator<Item = char>,
 {
-    type Item = Token;
+    type Item = (Token, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let c = self.iter.next()?;
             self.index += 1;
             if let Ok(token) = c.try_into() {
-                return Some(token);
+                // Need to subtract one since `index` now points to the next character.
+                return Some((token, self.index - 1));
             }
         }
-    }
-}
-
-/// Lexical analyzer that transforms a program to [`Token`]s.
-/// Can be peeked.
-#[derive(Debug)]
-pub struct PeekableLexer<L> {
-    lexer: L,
-    peeked: Option<Option<Token>>,
-}
-
-impl<L> PeekableLexer<L> {
-    pub fn new(lexer: L) -> Self {
-        Self {
-            lexer,
-            peeked: None,
-        }
-    }
-}
-
-impl<I> PeekableLexer<Lexer<I>>
-where
-    I: Iterator<Item = char>,
-{
-    #[allow(clippy::should_implement_trait)]
-    pub fn next(&mut self) -> Option<Token> {
-        match self.peeked.take() {
-            Some(v) => v,
-            None => self.lexer.next(),
-        }
-    }
-
-    pub fn peek(&mut self) -> Option<&Token> {
-        self.peeked
-            .get_or_insert_with(|| self.lexer.next())
-            .as_ref()
-    }
-
-    pub fn index(&self) -> usize {
-        self.lexer.index()
     }
 }
 
@@ -86,14 +43,14 @@ mod tests {
     fn parses_tokens() {
         let input = "><+-.,[]";
         let mut lexer = Lexer::new(input.chars());
-        assert_eq!(lexer.next(), Some(Token::MoveRight));
-        assert_eq!(lexer.next(), Some(Token::MoveLeft));
-        assert_eq!(lexer.next(), Some(Token::Increment));
-        assert_eq!(lexer.next(), Some(Token::Decrement));
-        assert_eq!(lexer.next(), Some(Token::Output));
-        assert_eq!(lexer.next(), Some(Token::Input));
-        assert_eq!(lexer.next(), Some(Token::LoopStart));
-        assert_eq!(lexer.next(), Some(Token::LoopEnd));
+        assert_eq!(lexer.next(), Some((Token::MoveRight, 0)));
+        assert_eq!(lexer.next(), Some((Token::MoveLeft, 1)));
+        assert_eq!(lexer.next(), Some((Token::Increment, 2)));
+        assert_eq!(lexer.next(), Some((Token::Decrement, 3)));
+        assert_eq!(lexer.next(), Some((Token::Output, 4)));
+        assert_eq!(lexer.next(), Some((Token::Input, 5)));
+        assert_eq!(lexer.next(), Some((Token::LoopStart, 6)));
+        assert_eq!(lexer.next(), Some((Token::LoopEnd, 7)));
         assert_eq!(lexer.next(), None);
     }
 
@@ -101,9 +58,9 @@ mod tests {
     fn ignores_non_token_characters() {
         let input = "[1-r2.";
         let mut lexer = Lexer::new(input.chars());
-        assert_eq!(lexer.next(), Some(Token::LoopStart));
-        assert_eq!(lexer.next(), Some(Token::Decrement));
-        assert_eq!(lexer.next(), Some(Token::Output));
+        assert_eq!(lexer.next(), Some((Token::LoopStart, 0)));
+        assert_eq!(lexer.next(), Some((Token::Decrement, 2)));
+        assert_eq!(lexer.next(), Some((Token::Output, 5)));
         assert_eq!(lexer.next(), None);
     }
 }

@@ -1,8 +1,8 @@
-use core::str::Chars;
+use core::{iter::Peekable, str::Chars};
 
 use thiserror::Error;
 
-use crate::{Instruction, Lexer, PeekableLexer, Token};
+use crate::{Instruction, Lexer, Token};
 
 /// Transformer from [`Token`]s to [`Instruction`]s.
 #[derive(Debug)]
@@ -11,11 +11,11 @@ pub struct IntermediateRepresentation<'a, I> {
     iter: I,
 }
 
-impl<'a> IntermediateRepresentation<'a, PeekableLexer<Lexer<Chars<'a>>>> {
+impl<'a> IntermediateRepresentation<'a, Peekable<Lexer<Chars<'a>>>> {
     pub fn new(program: &'a str) -> Self {
         Self {
             program,
-            iter: Lexer::new(program.chars()).to_peekable(),
+            iter: Lexer::new(program.chars()).peekable(),
         }
     }
 }
@@ -28,9 +28,9 @@ pub enum IRError {
     UnmatchedLoopEnd,
 }
 
-impl<'a, I> Iterator for IntermediateRepresentation<'a, PeekableLexer<Lexer<I>>>
+impl<'a, I> Iterator for IntermediateRepresentation<'a, Peekable<I>>
 where
-    I: Iterator<Item = char>,
+    I: Iterator<Item = (Token, usize)>,
 {
     type Item = Result<Instruction<'a>, IRError>;
 
@@ -39,7 +39,7 @@ where
             ($token:path, $instruction:path, $int:ty) => {{
                 let mut amount: $int = 1;
 
-                while let Some($token) = self.iter.peek() {
+                while let Some(($token, _)) = self.iter.peek() {
                     self.iter.next();
                     amount = amount.wrapping_add(1);
                 }
@@ -49,41 +49,40 @@ where
         }
 
         match self.iter.next()? {
-            Token::MoveRight => {
+            (Token::MoveRight, _) => {
                 instruction_amount!(Token::MoveRight, Instruction::MoveRight, usize)
             }
-            Token::MoveLeft => {
+            (Token::MoveLeft, _) => {
                 instruction_amount!(Token::MoveLeft, Instruction::MoveLeft, usize)
             }
-            Token::Increment => {
+            (Token::Increment, _) => {
                 instruction_amount!(Token::Increment, Instruction::Increment, u8)
             }
-            Token::Decrement => {
+            (Token::Decrement, _) => {
                 instruction_amount!(Token::Decrement, Instruction::Decrement, u8)
             }
-            Token::Output => Some(Ok(Instruction::Output)),
-            Token::Input => Some(Ok(Instruction::Input)),
-            Token::LoopStart => {
-                let start = self.iter.index();
-
+            (Token::Output, _) => Some(Ok(Instruction::Output)),
+            (Token::Input, _) => Some(Ok(Instruction::Input)),
+            (Token::LoopStart, start) => {
                 let mut open: usize = 1;
-                while open != 0 {
+                let program = loop {
                     match self.iter.next() {
-                        Some(Token::LoopStart) => open += 1,
-                        Some(Token::LoopEnd) => open -= 1,
+                        Some((Token::LoopStart, _)) => open += 1,
+                        Some((Token::LoopEnd, end)) => {
+                            open -= 1;
+                            if open == 0 {
+                                // The + 1 skips the [ at the start.
+                                break &self.program[(start + 1)..end];
+                            }
+                        }
                         Some(_) => (),
                         None => return Some(Err(IRError::UnmatchedLoopStart)),
                     }
-                }
+                };
 
-                // the - 1 removes the ] at the end
-                let end = self.iter.index() - 1;
-
-                Some(Ok(Instruction::Loop {
-                    program: &self.program[start..end],
-                }))
+                Some(Ok(Instruction::Loop { program }))
             }
-            Token::LoopEnd => Some(Err(IRError::UnmatchedLoopEnd)),
+            (Token::LoopEnd, _) => Some(Err(IRError::UnmatchedLoopEnd)),
         }
     }
 }

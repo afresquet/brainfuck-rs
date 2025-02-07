@@ -37,7 +37,7 @@ fn main() {
     match args.command {
         Commands::Tokenize => {
             let lexer = Lexer::new(program.chars());
-            for token in lexer {
+            for (token, _) in lexer {
                 println!("{token}");
             }
         }
