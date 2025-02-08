@@ -4,7 +4,7 @@ use core::{
     slice::SliceIndex,
 };
 
-use crate::{IRError, IntermediateRepresentation, Lexer, TokenIterator};
+use crate::{IRError, IntermediateRepresentation, TokenIterator};
 
 /// Instruction of the language.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -110,17 +110,12 @@ where
     fn iter_instruction(&'a self) -> Self::IntoIter;
 }
 
-impl<'a> InstructionIterator<'a> for str {
-    type IntoIter = IntermediateRepresentation<&'a Self, Peekable<Lexer<core::str::Chars<'a>>>>;
-
-    fn iter_instruction(&'a self) -> Self::IntoIter {
-        IntermediateRepresentation::new(self)
-    }
-}
-
-impl<'a> InstructionIterator<'a> for [u8] {
-    type IntoIter =
-        IntermediateRepresentation<&'a Self, Peekable<Lexer<core::slice::Iter<'a, u8>>>>;
+impl<'a, P> InstructionIterator<'a> for P
+where
+    P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized + 'a,
+    Range<usize>: SliceIndex<P>,
+{
+    type IntoIter = IntermediateRepresentation<&'a Self, Peekable<P::IntoIter>>;
 
     fn iter_instruction(&'a self) -> Self::IntoIter {
         IntermediateRepresentation::new(self)

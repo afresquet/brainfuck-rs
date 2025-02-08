@@ -45,7 +45,7 @@ where
             ($token:path, $instruction:path, $int:ty) => {{
                 let mut amount: $int = 1;
 
-                while let Some(($token, _)) = self.iter.peek() {
+                while let Some((_, $token)) = self.iter.peek() {
                     self.iter.next();
                     amount = amount.wrapping_add(1);
                 }
@@ -55,26 +55,26 @@ where
         }
 
         match self.iter.next()? {
-            (Token::MoveRight, _) => {
+            (_, Token::MoveRight) => {
                 instruction_amount!(Token::MoveRight, Instruction::MoveRight, usize)
             }
-            (Token::MoveLeft, _) => {
+            (_, Token::MoveLeft) => {
                 instruction_amount!(Token::MoveLeft, Instruction::MoveLeft, usize)
             }
-            (Token::Increment, _) => {
+            (_, Token::Increment) => {
                 instruction_amount!(Token::Increment, Instruction::Increment, u8)
             }
-            (Token::Decrement, _) => {
+            (_, Token::Decrement) => {
                 instruction_amount!(Token::Decrement, Instruction::Decrement, u8)
             }
-            (Token::Output, _) => Some(Ok(Instruction::Output)),
-            (Token::Input, _) => Some(Ok(Instruction::Input)),
-            (Token::LoopStart, start) => {
+            (_, Token::Output) => Some(Ok(Instruction::Output)),
+            (_, Token::Input) => Some(Ok(Instruction::Input)),
+            (start, Token::LoopStart) => {
                 let mut open: usize = 1;
                 let program = loop {
                     match self.iter.next() {
-                        Some((Token::LoopStart, _)) => open += 1,
-                        Some((Token::LoopEnd, end)) => {
+                        Some((_, Token::LoopStart)) => open += 1,
+                        Some((end, Token::LoopEnd)) => {
                             open -= 1;
                             if open == 0 {
                                 // The + 1 skips the [ at the start.
@@ -88,7 +88,7 @@ where
 
                 Some(Ok(Instruction::Loop(InstructionLoop::new(program))))
             }
-            (Token::LoopEnd, _) => Some(Err(IRError::UnmatchedLoopEnd)),
+            (_, Token::LoopEnd) => Some(Err(IRError::UnmatchedLoopEnd)),
         }
     }
 }

@@ -103,7 +103,7 @@ impl From<Token> for char {
 }
 
 pub trait TokenIterator<'a> {
-    type IntoIter: Iterator<Item = (Token, usize)>;
+    type IntoIter: Iterator<Item = (usize, Token)>;
 
     fn iter_token(&'a self) -> Self::IntoIter;
 }
@@ -121,5 +121,13 @@ impl<'a> TokenIterator<'a> for [u8] {
 
     fn iter_token(&'a self) -> Self::IntoIter {
         Lexer::new(self.iter())
+    }
+}
+
+impl<'a> TokenIterator<'a> for [Token] {
+    type IntoIter = core::iter::Enumerate<core::iter::Copied<core::slice::Iter<'a, Token>>>;
+
+    fn iter_token(&'a self) -> Self::IntoIter {
+        self.iter().copied().enumerate()
     }
 }
