@@ -17,9 +17,10 @@ impl<I> Lexer<I> {
     }
 }
 
-impl<I> Iterator for Lexer<I>
+impl<I, T> Iterator for Lexer<I>
 where
-    I: Iterator<Item = char>,
+    I: Iterator<Item = T>,
+    T: TryInto<Token>,
 {
     type Item = (Token, usize);
 
@@ -37,12 +38,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::TokenIterator;
+
     use super::*;
 
     #[test]
     fn parses_tokens() {
-        let input = "><+-.,[]";
-        let mut lexer = Lexer::new(input.chars());
+        let program = "><+-.,[]";
+        let mut lexer = program.iter_token();
         assert_eq!(lexer.next(), Some((Token::MoveRight, 0)));
         assert_eq!(lexer.next(), Some((Token::MoveLeft, 1)));
         assert_eq!(lexer.next(), Some((Token::Increment, 2)));
@@ -56,8 +59,8 @@ mod tests {
 
     #[test]
     fn ignores_non_token_characters() {
-        let input = "[1-r2.";
-        let mut lexer = Lexer::new(input.chars());
+        let program = "[1-r2.";
+        let mut lexer = program.iter_token();
         assert_eq!(lexer.next(), Some((Token::LoopStart, 0)));
         assert_eq!(lexer.next(), Some((Token::Decrement, 2)));
         assert_eq!(lexer.next(), Some((Token::Output, 5)));

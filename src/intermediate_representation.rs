@@ -1,22 +1,27 @@
-use core::{iter::Peekable, str::Chars};
+use core::{
+    iter::Peekable,
+    ops::{Index, Range},
+    slice::SliceIndex,
+};
 
 use thiserror::Error;
 
-use crate::{Instruction, Lexer, Token};
+use crate::{Instruction, InstructionLoop, Token, TokenIterator};
 
 /// Transformer from [`Token`]s to [`Instruction`]s.
 #[derive(Debug)]
-pub struct IntermediateRepresentation<'a, I> {
-    program: &'a str,
+pub struct IntermediateRepresentation<P, I> {
+    program: P,
     iter: I,
 }
 
-impl<'a> IntermediateRepresentation<'a, Peekable<Lexer<Chars<'a>>>> {
-    pub fn new(program: &'a str) -> Self {
-        Self {
-            program,
-            iter: Lexer::new(program.chars()).peekable(),
-        }
+impl<'a, P> IntermediateRepresentation<&'a P, Peekable<P::IntoIter>>
+where
+    P: TokenIterator<'a> + ?Sized,
+{
+    pub fn new(program: &'a P) -> Self {
+        let iter = program.iter_token().peekable();
+        Self { program, iter }
     }
 }
 
@@ -28,11 +33,12 @@ pub enum IRError {
     UnmatchedLoopEnd,
 }
 
-impl<'a, I> Iterator for IntermediateRepresentation<'a, Peekable<I>>
+impl<'a, P> Iterator for IntermediateRepresentation<&'a P, Peekable<P::IntoIter>>
 where
-    I: Iterator<Item = (Token, usize)>,
+    P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized,
+    Range<usize>: SliceIndex<P>,
 {
-    type Item = Result<Instruction<'a>, IRError>;
+    type Item = Result<Instruction<&'a <P as Index<Range<usize>>>::Output>, IRError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         macro_rules! instruction_amount {
@@ -80,7 +86,7 @@ where
                     }
                 };
 
-                Some(Ok(Instruction::Loop { program }))
+                Some(Ok(Instruction::Loop(InstructionLoop::new(program))))
             }
             (Token::LoopEnd, _) => Some(Err(IRError::UnmatchedLoopEnd)),
         }
@@ -89,12 +95,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::InstructionIterator;
+
     use super::*;
 
     #[test]
     fn parses_instructions() {
-        let input = ">>><<++++-..,[[--->>]][++<]";
-        let mut ir = IntermediateRepresentation::new(input);
+        let program = ">>><<++++-..,[[--->>]][++<]";
+        let mut ir = program.iter_instruction();
         assert_eq!(ir.next(), Some(Ok(Instruction::MoveRight(3))));
         assert_eq!(ir.next(), Some(Ok(Instruction::MoveLeft(2))));
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(4))));
@@ -102,17 +110,16 @@ mod tests {
         assert_eq!(ir.next(), Some(Ok(Instruction::Output)));
         assert_eq!(ir.next(), Some(Ok(Instruction::Output)));
         assert_eq!(ir.next(), Some(Ok(Instruction::Input)));
-        let Some(Ok(Instruction::Loop { program })) = ir.next() else {
+        let Some(Ok(Instruction::Loop(instruction_loop))) = ir.next() else {
             panic!("should be a loop");
         };
-        assert_eq!(program, "[--->>]");
-        let Some(Ok(Instruction::Loop { program })) =
-            IntermediateRepresentation::new(program).next()
+        assert_eq!(instruction_loop.program(), "[--->>]");
+        let Some(Ok(Instruction::Loop(instruction_loop))) = instruction_loop.into_iter().next()
         else {
             panic!("should be a loop");
         };
-        assert_eq!(program, "--->>");
-        let mut inner_instruction_loop = IntermediateRepresentation::new(program);
+        assert_eq!(instruction_loop.program(), "--->>");
+        let mut inner_instruction_loop = instruction_loop.into_iter();
         assert_eq!(
             inner_instruction_loop.next(),
             Some(Ok(Instruction::Decrement(3)))
@@ -121,11 +128,11 @@ mod tests {
             inner_instruction_loop.next(),
             Some(Ok(Instruction::MoveRight(2)))
         );
-        let Some(Ok(Instruction::Loop { program })) = ir.next() else {
+        let Some(Ok(Instruction::Loop(instruction_loop))) = ir.next() else {
             panic!("should be a loop");
         };
-        assert_eq!(program, "++<");
-        let mut instruction_loop = IntermediateRepresentation::new(program);
+        assert_eq!(instruction_loop.program(), "++<");
+        let mut instruction_loop = instruction_loop.into_iter();
         assert_eq!(instruction_loop.next(), Some(Ok(Instruction::Increment(2))));
         assert_eq!(instruction_loop.next(), Some(Ok(Instruction::MoveLeft(1))));
         assert_eq!(ir.next(), None);
@@ -133,24 +140,24 @@ mod tests {
 
     #[test]
     fn amount_wraps_around() {
-        let input: String = core::iter::repeat_n('+', 260).collect();
-        let mut ir = IntermediateRepresentation::new(&input);
+        let program: String = core::iter::repeat_n('+', 260).collect();
+        let mut ir = program.iter_instruction();
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(4))));
         assert_eq!(ir.next(), None);
     }
 
     #[test]
     fn errors_on_unmatched_loop_start() {
-        let input = "+++[---";
-        let mut ir = IntermediateRepresentation::new(input);
+        let program = "+++[---";
+        let mut ir = program.iter_instruction();
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(3))));
         assert_eq!(ir.next(), Some(Err(IRError::UnmatchedLoopStart)));
     }
 
     #[test]
     fn errors_on_unmatched_loop_end() {
-        let input = "+++]---";
-        let mut ir = IntermediateRepresentation::new(input);
+        let program = "+++]---";
+        let mut ir = program.iter_instruction();
         assert_eq!(ir.next(), Some(Ok(Instruction::Increment(3))));
         assert_eq!(ir.next(), Some(Err(IRError::UnmatchedLoopEnd)));
     }

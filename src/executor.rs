@@ -1,6 +1,11 @@
+use core::{
+    ops::{Index, Range},
+    slice::SliceIndex,
+};
+
 use thiserror::Error;
 
-use crate::{IRError, InputStream, Instruction, IntermediateRepresentation, OutputStream};
+use crate::{IRError, InputStream, Instruction, OutputStream, TokenIterator};
 
 /// Program runner.
 #[derive(Debug)]
@@ -31,19 +36,26 @@ where
     I: InputStream<Error = IE>,
     O: OutputStream<Error = OE>,
 {
-    pub fn execute(&mut self, instruction: &Instruction) -> Result<(), ExecutorError<IE, OE>> {
+    pub fn execute<'a, P>(
+        &mut self,
+        instruction: Instruction<&'a P>,
+    ) -> Result<(), ExecutorError<IE, OE>>
+    where
+        P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized,
+        Range<usize>: SliceIndex<P>,
+    {
         match instruction {
             Instruction::MoveRight(amount) => {
-                self.pointer = self.pointer.wrapping_add(*amount) % N;
+                self.pointer = self.pointer.wrapping_add(amount) % N;
             }
             Instruction::MoveLeft(amount) => {
-                self.pointer = self.pointer.wrapping_sub(*amount) % N;
+                self.pointer = self.pointer.wrapping_sub(amount) % N;
             }
             Instruction::Increment(amount) => {
-                self.data[self.pointer] = self.data[self.pointer].wrapping_add(*amount);
+                self.data[self.pointer] = self.data[self.pointer].wrapping_add(amount);
             }
             Instruction::Decrement(amount) => {
-                self.data[self.pointer] = self.data[self.pointer].wrapping_sub(*amount);
+                self.data[self.pointer] = self.data[self.pointer].wrapping_sub(amount);
             }
             Instruction::Output => {
                 self.output
@@ -53,10 +65,10 @@ where
             Instruction::Input => {
                 self.data[self.pointer] = self.input.read().map_err(ExecutorError::InputError)?
             }
-            Instruction::Loop { program } => {
+            Instruction::Loop(instructions) => {
                 while self.data[self.pointer] > 0 {
-                    for instruction in IntermediateRepresentation::new(program) {
-                        self.execute(&instruction?)?;
+                    for instruction in &instructions {
+                        self.execute(instruction?)?;
                     }
                 }
             }

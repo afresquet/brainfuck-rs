@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use brainfuck::{Executor, IntermediateRepresentation, Lexer};
+use brainfuck::{Executor, InstructionIterator, TokenIterator};
 use clap::{Parser, ValueEnum};
 
 /// A Brainfuck interpreter
@@ -36,22 +36,19 @@ fn main() {
 
     match args.command {
         Commands::Tokenize => {
-            let lexer = Lexer::new(program.chars());
-            for (token, _) in lexer {
+            for (token, _) in program.iter_token() {
                 println!("{token}");
             }
         }
         Commands::IR => {
-            let ir = IntermediateRepresentation::new(&program);
-            for instruction in ir.map(Result::unwrap) {
+            for instruction in program.iter_instruction().map(Result::unwrap) {
                 println!("{instruction}");
             }
         }
         Commands::Run => {
-            let ir = IntermediateRepresentation::new(&program);
             let mut executor = Executor::default();
-            for instruction in ir.map(Result::unwrap) {
-                executor.execute(&instruction).unwrap();
+            for instruction in program.iter_instruction().map(Result::unwrap) {
+                executor.execute(instruction).unwrap();
             }
         }
     }
