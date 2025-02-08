@@ -36,7 +36,7 @@ fn main() {
 
     match args.command {
         Commands::Tokenize => {
-            for (token, _) in program.iter_token() {
+            for (_, token) in program.iter_token() {
                 println!("{token}");
             }
         }

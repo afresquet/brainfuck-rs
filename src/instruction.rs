@@ -1,14 +1,10 @@
-use core::{
-    iter::Peekable,
-    ops::{Index, Range},
-    slice::SliceIndex,
-};
+use core::iter::Peekable;
 
-use crate::{IRError, IntermediateRepresentation, TokenIterator};
+use crate::{IRError, IntermediateRepresentation, Ranged, TokenIterator};
 
 /// Instruction of the language.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Instruction<P> {
+pub enum Instruction<T> {
     /// >
     ///
     /// Increment the data pointer by an amount (to point to the right).
@@ -36,45 +32,43 @@ pub enum Instruction<P> {
     /// []
     ///
     /// Loop if the data pointer is not zero.
-    Loop(InstructionLoop<P>),
+    Loop(InstructionLoop<T>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct InstructionLoop<P>(P);
+pub struct InstructionLoop<T>(T);
 
-impl<P> InstructionLoop<P> {
-    pub fn new(program: P) -> Self {
+impl<T> InstructionLoop<T> {
+    pub fn new(program: T) -> Self {
         Self(program)
     }
 }
 
-impl<'a, P> InstructionLoop<&'a P>
+impl<'a, T> InstructionLoop<&'a T>
 where
-    P: ?Sized,
+    T: ?Sized,
 {
-    pub fn program(&self) -> &'a P {
+    pub fn program(&self) -> &'a T {
         self.0
     }
 }
 
-impl<'a, P> IntoIterator for &InstructionLoop<&'a P>
+impl<'a, T> IntoIterator for &InstructionLoop<&'a T>
 where
-    P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized,
-    Range<usize>: SliceIndex<P>,
+    T: TokenIterator<'a> + Ranged + ?Sized,
 {
-    type Item = Result<Instruction<&'a <P as Index<Range<usize>>>::Output>, IRError>;
+    type Item = Result<Instruction<&'a T>, IRError>;
 
-    type IntoIter = IntermediateRepresentation<&'a P, Peekable<P::IntoIter>>;
+    type IntoIter = IntermediateRepresentation<&'a T, Peekable<T::TokenIter>>;
 
     fn into_iter(self) -> Self::IntoIter {
         IntermediateRepresentation::new(self.program())
     }
 }
 
-impl<'a, P> core::fmt::Display for Instruction<&'a P>
+impl<'a, T> core::fmt::Display for Instruction<&'a T>
 where
-    P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized,
-    Range<usize>: SliceIndex<P>,
+    T: TokenIterator<'a> + Ranged + ?Sized,
 {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
@@ -98,26 +92,22 @@ where
     }
 }
 
-pub trait InstructionIterator<'a, P = Self>
+pub trait InstructionIterator<'a, E, T = Self>
 where
-    P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized + 'a,
-    Range<usize>: SliceIndex<P>,
+    T: TokenIterator<'a> + Ranged + ?Sized + 'a,
 {
-    type IntoIter: Iterator<
-        Item = Result<Instruction<&'a <P as Index<Range<usize>>>::Output>, IRError>,
-    >;
+    type InstructionIter: Iterator<Item = Result<Instruction<&'a T>, E>>;
 
-    fn iter_instruction(&'a self) -> Self::IntoIter;
+    fn iter_instruction(&'a self) -> Self::InstructionIter;
 }
 
-impl<'a, P> InstructionIterator<'a> for P
+impl<'a, T> InstructionIterator<'a, IRError> for T
 where
-    P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized + 'a,
-    Range<usize>: SliceIndex<P>,
+    T: TokenIterator<'a> + Ranged + ?Sized + 'a,
 {
-    type IntoIter = IntermediateRepresentation<&'a Self, Peekable<P::IntoIter>>;
+    type InstructionIter = IntermediateRepresentation<&'a Self, Peekable<T::TokenIter>>;
 
-    fn iter_instruction(&'a self) -> Self::IntoIter {
+    fn iter_instruction(&'a self) -> Self::InstructionIter {
         IntermediateRepresentation::new(self)
     }
 }

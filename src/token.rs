@@ -103,31 +103,31 @@ impl From<Token> for char {
 }
 
 pub trait TokenIterator<'a> {
-    type IntoIter: Iterator<Item = (usize, Token)>;
+    type TokenIter: Iterator<Item = (usize, Token)>;
 
-    fn iter_token(&'a self) -> Self::IntoIter;
+    fn iter_token(&'a self) -> Self::TokenIter;
 }
 
 impl<'a> TokenIterator<'a> for str {
-    type IntoIter = Lexer<core::str::Chars<'a>>;
+    type TokenIter = Lexer<core::str::Chars<'a>>;
 
-    fn iter_token(&'a self) -> Self::IntoIter {
+    fn iter_token(&'a self) -> Self::TokenIter {
         Lexer::new(self.chars())
     }
 }
 
 impl<'a> TokenIterator<'a> for [u8] {
-    type IntoIter = Lexer<core::slice::Iter<'a, u8>>;
+    type TokenIter = Lexer<core::slice::Iter<'a, u8>>;
 
-    fn iter_token(&'a self) -> Self::IntoIter {
+    fn iter_token(&'a self) -> Self::TokenIter {
         Lexer::new(self.iter())
     }
 }
 
 impl<'a> TokenIterator<'a> for [Token] {
-    type IntoIter = core::iter::Enumerate<core::iter::Copied<core::slice::Iter<'a, Token>>>;
+    type TokenIter = core::iter::Enumerate<core::iter::Copied<core::slice::Iter<'a, Token>>>;
 
-    fn iter_token(&'a self) -> Self::IntoIter {
+    fn iter_token(&'a self) -> Self::TokenIter {
         self.iter().copied().enumerate()
     }
 }

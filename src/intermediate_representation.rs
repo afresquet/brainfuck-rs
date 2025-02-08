@@ -1,25 +1,21 @@
-use core::{
-    iter::Peekable,
-    ops::{Index, Range},
-    slice::SliceIndex,
-};
+use core::iter::Peekable;
 
 use thiserror::Error;
 
-use crate::{Instruction, InstructionLoop, Token, TokenIterator};
+use crate::{Instruction, InstructionLoop, Ranged, Token, TokenIterator};
 
 /// Transformer from [`Token`]s to [`Instruction`]s.
 #[derive(Debug)]
-pub struct IntermediateRepresentation<P, I> {
-    program: P,
+pub struct IntermediateRepresentation<T, I> {
+    program: T,
     iter: I,
 }
 
-impl<'a, P> IntermediateRepresentation<&'a P, Peekable<P::IntoIter>>
+impl<'a, T> IntermediateRepresentation<&'a T, Peekable<T::TokenIter>>
 where
-    P: TokenIterator<'a> + ?Sized,
+    T: TokenIterator<'a> + ?Sized,
 {
-    pub fn new(program: &'a P) -> Self {
+    pub fn new(program: &'a T) -> Self {
         let iter = program.iter_token().peekable();
         Self { program, iter }
     }
@@ -33,12 +29,11 @@ pub enum IRError {
     UnmatchedLoopEnd,
 }
 
-impl<'a, P> Iterator for IntermediateRepresentation<&'a P, Peekable<P::IntoIter>>
+impl<'a, T> Iterator for IntermediateRepresentation<&'a T, Peekable<T::TokenIter>>
 where
-    P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized,
-    Range<usize>: SliceIndex<P>,
+    T: TokenIterator<'a> + Ranged + ?Sized,
 {
-    type Item = Result<Instruction<&'a <P as Index<Range<usize>>>::Output>, IRError>;
+    type Item = Result<Instruction<&'a T>, IRError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         macro_rules! instruction_amount {
@@ -78,7 +73,7 @@ where
                             open -= 1;
                             if open == 0 {
                                 // The + 1 skips the [ at the start.
-                                break &self.program[(start + 1)..end];
+                                break self.program.range(start + 1, end);
                             }
                         }
                         Some(_) => (),

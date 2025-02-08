@@ -1,11 +1,6 @@
-use core::{
-    ops::{Index, Range},
-    slice::SliceIndex,
-};
-
 use thiserror::Error;
 
-use crate::{IRError, InputStream, Instruction, OutputStream, TokenIterator};
+use crate::{IRError, InputStream, Instruction, OutputStream, Ranged, TokenIterator};
 
 /// Program runner.
 #[derive(Debug)]
@@ -36,13 +31,12 @@ where
     I: InputStream<Error = IE>,
     O: OutputStream<Error = OE>,
 {
-    pub fn execute<'a, P>(
+    pub fn execute<'a, T>(
         &mut self,
-        instruction: Instruction<&'a P>,
+        instruction: Instruction<&'a T>,
     ) -> Result<(), ExecutorError<IE, OE>>
     where
-        P: TokenIterator<'a> + Index<Range<usize>, Output = P> + ?Sized,
-        Range<usize>: SliceIndex<P>,
+        T: TokenIterator<'a> + Ranged + ?Sized,
     {
         match instruction {
             Instruction::MoveRight(amount) => {
