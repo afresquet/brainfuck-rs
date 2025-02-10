@@ -81,16 +81,3 @@ pub enum ExecutorError<I, O> {
     #[error(transparent)]
     IRError(#[from] IRError),
 }
-
-#[cfg(feature = "std")]
-mod stdio {
-    use std::io::{stdin, stdout, Stdin, Stdout};
-
-    use super::Executor;
-
-    impl Default for Executor<Stdin, Stdout> {
-        fn default() -> Self {
-            Self::new(stdin(), stdout())
-        }
-    }
-}

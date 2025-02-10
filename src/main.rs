@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::{
+    io::{stdin, stdout},
+    path::PathBuf,
+};
 
 use brainfuck::{Executor, InstructionIterator, TokenIterator};
 use clap::{Parser, ValueEnum};
@@ -46,7 +49,8 @@ fn main() {
             }
         }
         Commands::Run => {
-            let mut executor = Executor::default();
+            let mut executor: Executor<_, _, 30000> =
+                Executor::new(stdin().lock(), stdout().lock());
             for instruction in program.iter_instruction().map(Result::unwrap) {
                 executor.execute(instruction).unwrap();
             }
